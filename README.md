@@ -6,7 +6,46 @@ An end-to-end algorithmic trading system that constructs a long-short equity por
 
 ## Overview
 
-The system identifies mispriced S&P 500 stocks by comparing each stock's predicted price (derived from the FF5 model) against its current market price. It then cross-validates those signals against changes in institutional holdings — and only enters positions where both signals agree. The result is a market-neutral, long-short portfolio of 10 stocks (5 long, 5 short) rebalanced periodically.
+This project covers the full trading pipeline — from raw data collection all the way to live order execution — and was built to demonstrate the practical application of academic asset pricing theory in a real brokerage environment.
+
+### The investment idea
+
+The central idea is that stocks can be **systematically mispriced** relative to their fundamental risk profile. When a quantitative model flags a mispricing *and* major institutional investors are moving in the same direction, the signal is stronger than either source alone. The system acts only when both agree.
+
+### Signal 1 — Fama-French 5-Factor Model (FF5)
+
+The FF5 model, developed by Nobel Prize-winner Eugene Fama and Kenneth French, explains stock returns through five risk factors:
+
+| Factor | What it captures |
+|--------|-----------------|
+| **Mkt-RF** | Exposure to the overall market |
+| **SMB** | Small-cap vs. large-cap tilt |
+| **HML** | Value vs. growth tilt |
+| **RMW** | Profitability of the firm |
+| **CMA** | Conservative vs. aggressive investment policy |
+
+For every S&P 500 stock, the system estimates its sensitivity to these five factors using **20 years of monthly return data**, then uses the most recent factor values to forecast what the stock's price *should* be next month. If the predicted price is above today's price → **BUY**. If below → **SELL**.
+
+### Signal 2 — Institutional Sentiment from SEC 13F Filings
+
+Asset managers with over $100M in AUM must disclose their holdings quarterly to the SEC via 13F filings. The system scrapes these filings for **seven of the world's largest institutions** — BlackRock, Vanguard, Fidelity, State Street, Morgan Stanley, JP Morgan, and Goldman Sachs — and calculates the net change in portfolio weight (`WeightDiff`) for each S&P 500 stock. Stocks being collectively accumulated are treated as bullish; stocks being reduced are bearish.
+
+### Portfolio construction
+
+From the stocks where both signals agree, the system selects:
+
+- **Top 5 by institutional accumulation** → long positions
+- **Bottom 5 by institutional reduction** → short positions
+
+Weights are proportional to the magnitude of the institutional shift. The result is a **market-neutral, 10-stock long-short portfolio** designed to profit from relative mispricing regardless of overall market direction.
+
+### Execution
+
+The portfolio is submitted to Interactive Brokers via `ib_insync`. Each position gets a **market order** (immediate entry) and a **limit order** at the FF5-predicted price as a take-profit target. A separate liquidation notebook handles end-of-period cleanup: it cancels open orders, closes all positions at market, and prints the realised annual return.
+
+### Tech stack
+
+The project is intentionally split across two languages — **Python** for data processing, statistical modelling, and IB API integration, and **C#/.NET** for the web scraping layer — using each where it performs best.
 
 ---
 
